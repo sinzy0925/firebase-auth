@@ -1,0 +1,9 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /apiKeys/{docId} {
+      // ログインしていれば読み書きリストすべて許可 (テスト用！)
+      allow read, write, list: if request.auth != null;
+    }
+  }
+}

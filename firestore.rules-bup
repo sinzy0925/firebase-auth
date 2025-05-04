@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // APIキードキュメントは、そのキーの所有者(user_uid)のみ読み書き可能にする
+    match /apiKeys/{docId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.user_uid;
+    }
+    // ユーザーごとのAPIキーリスト読み込みは、そのユーザー自身のみ許可
+     match /apiKeys/{docId} {
+       allow list: if request.auth != null && request.auth.uid == request.query.resource.data.user_uid;
+    }
+  }
+}

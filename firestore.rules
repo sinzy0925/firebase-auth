@@ -1,0 +1,29 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // /apiKeys コレクション内のドキュメント ({docId} は任意のドキュメントIDを表す) に対するルール
+    match /apiKeys/{docId} {
+
+      // 読み取り (read): 個々のドキュメントを読む操作
+      // 条件: ログインしていて (request.auth != null) かつ
+      //       ドキュメント内の user_uid フィールドの値が、リクエストしてきたユーザーのUID (request.auth.uid) と一致する場合のみ許可
+      allow read: if request.auth != null && resource.data.user_uid == request.auth.uid;
+
+      // 書き込み (write): ドキュメントの作成 (create), 更新 (update), 削除 (delete) 操作
+      // 条件: ログインしていて (request.auth != null) かつ
+      //       以下のいずれかの条件を満たす場合のみ許可
+      //       1. 作成時: 新しく作成されるドキュメント (request.resource.data) の user_uid が自分のUIDと一致する
+      //       2. 更新/削除時: 既に存在するドキュメント (resource.data) の user_uid が自分のUIDと一致する
+      allow write: if request.auth != null &&
+                      (request.resource.data.user_uid == request.auth.uid || resource.data.user_uid == request.auth.uid);
+
+      // 一覧取得 (list): コレクション内の複数のドキュメントを読む操作 (例: .where().get())
+      // 条件: ログインしていて (request.auth != null) かつ
+      //       クエリで取得するドキュメント数が100件以下 (request.query.limit <= 100) の場合のみ許可
+      //       (不正な大量読み込みを防ぐため limit を設定するのが一般的)
+      allow list: if request.auth != null && request.query.limit <= 100;
+    }
+  }
+}

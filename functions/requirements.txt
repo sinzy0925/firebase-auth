@@ -1,0 +1,6 @@
+firebase_functions~=0.1.0
+firebase-admin
+google-auth
+google-auth-oauthlib
+requests
+google-api-python-client
