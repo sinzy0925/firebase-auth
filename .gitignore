@@ -15,6 +15,7 @@ functions/*.local
 functions/venv/
 functions/*.log
 functions/serviceAccountKey.json
+functions/.env.sinzy0925-1d67f
 
 # Firebase cache
 .firebase/
