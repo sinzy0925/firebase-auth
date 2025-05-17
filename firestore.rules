@@ -3,27 +3,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // /apiKeys コレクション内のドキュメント ({docId} は任意のドキュメントIDを表す) に対するルール
-    match /apiKeys/{docId} {
-
-      // 読み取り (read): 個々のドキュメントを読む操作
-      // 条件: ログインしていて (request.auth != null) かつ
-      //       ドキュメント内の user_uid フィールドの値が、リクエストしてきたユーザーのUID (request.auth.uid) と一致する場合のみ許可
+    match /apiKeys/{apiKeyId} { // {docId} を {apiKeyId} に変更すると意図が明確かも
       allow read: if request.auth != null && resource.data.user_uid == request.auth.uid;
-
-      // 書き込み (write): ドキュメントの作成 (create), 更新 (update), 削除 (delete) 操作
-      // 条件: ログインしていて (request.auth != null) かつ
-      //       以下のいずれかの条件を満たす場合のみ許可
-      //       1. 作成時: 新しく作成されるドキュメント (request.resource.data) の user_uid が自分のUIDと一致する
-      //       2. 更新/削除時: 既に存在するドキュメント (resource.data) の user_uid が自分のUIDと一致する
       allow write: if request.auth != null &&
                       (request.resource.data.user_uid == request.auth.uid || resource.data.user_uid == request.auth.uid);
-
-      // 一覧取得 (list): コレクション内の複数のドキュメントを読む操作 (例: .where().get())
-      // 条件: ログインしていて (request.auth != null) かつ
-      //       クエリで取得するドキュメント数が100件以下 (request.query.limit <= 100) の場合のみ許可
-      //       (不正な大量読み込みを防ぐため limit を設定するのが一般的)
+      // apiKeysのlistルールは、generate_or_fetch_api_key関数が user_uid で絞り込むため、
+      // より安全にするなら、そのクエリを模倣したルールも検討できます。
+      // 例: allow list: if request.auth != null && request.query.resource.data.user_uid == request.auth.uid;
+      // ただし、listルールで request.query.resource は使えないので、
+      // 実際には request.auth.uid を使ったクエリを強制する形になります。
+      // シンプルにするなら現状の limit だけでも良いですが、より絞ることも可能です。
       allow list: if request.auth != null && request.query.limit <= 100;
+    }
+
+    // processedTransactions コレクションのルール
+    match /processedTransactions/{transactionDocId} {
+      // 関数 (record_api_usage) からの作成と読み取りを許可
+      // このルールは、関数が信頼できるコンテキストで実行されることを前提とします。
+      // クライアントからの直接アクセスは想定していません。
+      // 重要: このルールでは誰でも (認証なしでも) read/create できてしまうため、
+      // 関数が公開エンドポイントの場合はセキュリティリスクになります。
+      // 関数がバックエンド間通信で使われる場合は許容できるかもしれません。
+      // より安全にするには、関数の呼び出し元を検証するか、
+      // 関数が特定のサービスアカウントとして動作し、そのSAのみを許可するルールにします。
+      allow read, create: if true; // ★注意: 開発用。本番では要セキュリティ検討★
+
+      // 更新と削除は通常不要
+      allow update, delete: if false;
+    }
+
+    // test_collection (hello_world関数用、以前のまま)
+    match /test_collection/{docId} {
+      allow read, write: if true; // 開発用。本番では要検討
+    }
+
+    // test_from_hello (helloWorld関数用、以前のまま)
+    match /test_from_hello/{docId} {
+        allow read, write: if true; // 開発用。本番では要検討
     }
   }
 }

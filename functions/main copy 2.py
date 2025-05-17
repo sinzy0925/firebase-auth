@@ -1,6 +1,4 @@
 # functions/main.py
-
-# --- 標準ライブラリ ---
 import os
 import uuid
 import random
@@ -9,17 +7,20 @@ from datetime import datetime, timezone, timedelta
 import traceback
 import json
 
-from firebase_functions import https_fn, options
+# Firebase / Google Cloud ライブラリ
+from firebase_functions import https_fn, options # corsはoptions経由でアクセス
 import firebase_admin
-from firebase_admin import initialize_app
-from firebase_admin import firestore # ← これが重要
-from firebase_admin import auth
+from firebase_admin import initialize_app, firestore, auth
 
-from google.cloud.firestore_v1.client import Client as FirestoreClient # FirestoreClient は使われていないかも
+# 型ヒント用
+from google.cloud.firestore_v1.client import Client as FirestoreClient
 from google.cloud.firestore_v1.document import DocumentReference
 from google.cloud.firestore_v1.transaction import Transaction
 from google.cloud.firestore_v1.base_query import FieldFilter
 from google.api_core import exceptions as google_exceptions
+
+# functions/main.py (Admin SDK遅延初期化テスト)
+import json # Responseで使うので
 
 # --- 全体的なオプション設定 ---
 options.set_global_options(region=options.SupportedRegion.ASIA_NORTHEAST1)
@@ -60,78 +61,66 @@ import json # create_error_response などで使うため、トップレベル�
 db: firestore.Client | None = None # 型ヒントをより具体的に
 _default_app_initialized_flag = False # initialize_app() が呼ばれたかのフラグ
 
-# ensure_firebase_initialized 関数の修正案
 def ensure_firebase_initialized():
     global db, _default_app_initialized_flag
 
-    # (前半のログと初期化チェックは変更なし)
     print(f"DEBUG: ensure_firebase_initialized: Called. Current global db is {('None' if db is None else 'SET')}, id(db): {id(db)}. App initialized flag: {_default_app_initialized_flag}")
+
+    # 既に有効なdbクライアントがあれば何もしない
     if db is not None:
         print("INFO: ensure_firebase_initialized: db client already valid and exists. Skipping.")
         return
 
+    # アプリがまだ初期化されていない場合のみ initialize_app() を試みる
     if not _default_app_initialized_flag:
-        print("INFO: ensure_firebase_initialized: Default Firebase app not yet initialized. Attempting initialize_app().")
+        print("INFO: ensure_firebase_initialized: Default Firebase app not yet initialized by this function instance. Attempting initialize_app().")
         try:
+            # デフォルトの認証情報を探す。環境変数 GOOGLE_APPLICATION_CREDENTIALS があればそれが使われる。
+            # クラウド環境では、実行サービスアカウントの認証情報が自動的に使われるはず。
             print(f"DEBUG: ensure_firebase_initialized: GOOGLE_APPLICATION_CREDENTIALS env var is: {os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')}")
-            initialize_app()
+            initialize_app() # 引数なしでデフォルトアプリを初期化
             print("INFO: ensure_firebase_initialized: initialize_app() successful.")
-            _default_app_initialized_flag = True
-        except ValueError as ve:
+            _default_app_initialized_flag = True # このインスタンスでは初期化が試みられたことを記録
+        except ValueError as ve: # よくあるのは "The default Firebase app already exists."
             if "already exists" in str(ve).lower():
                 print("INFO: ensure_firebase_initialized: Default Firebase app already existed. Using existing one.")
-                _default_app_initialized_flag = True
+                _default_app_initialized_flag = True # 既存のものを使うのでフラグを立てる
             else:
                 print(f"ERROR: ensure_firebase_initialized: ValueError during initialize_app(): {ve}")
                 traceback.print_exc()
-                db = None
-                return
+                db = None # 念のため
+                return # 初期化失敗なのでここで抜ける
         except Exception as admin_init_err:
             print(f"ERROR: ensure_firebase_initialized: Exception during initialize_app(): {admin_init_err}")
             traceback.print_exc()
-            db = None
-            return
+            db = None # 念のため
+            return # 初期化失敗なのでここで抜ける
     else:
-        print("INFO: ensure_firebase_initialized: Default Firebase app was already marked as initialized.")
+        print("INFO: ensure_firebase_initialized: Default Firebase app was already marked as initialized by this instance.")
 
+    # Admin SDKアプリの初期化が成功した (または既にされていた) 場合のみ、Firestoreクライアントを取得
     if _default_app_initialized_flag:
-        print("INFO: ensure_firebase_initialized: Attempting to get Firestore client (this might take a moment)...")
+        print("INFO: ensure_firebase_initialized: Attempting to get Firestore client...")
         try:
-            # Firestoreクライアント取得を試行
-            temp_db_client = firestore.client() # ここでプロジェクトIDが解決される
-            
-            # ★★★デバッグログ追加★★★
-            if temp_db_client:
-                print(f"DEBUG: ensure_firebase_initialized: firestore.client() returned an object of type: {type(temp_db_client)}")
-                # 実際に簡単なオペレーションを試みて、クライアントが有効か確認する (オプション)
-                # try:
-                #     collections = list(temp_db_client.collections(limit=1)) # 小さな読み取り試行
-                #     print(f"DEBUG: ensure_firebase_initialized: Firestore client test read successful. Found collections: {len(collections)}")
-                # except Exception as test_read_err:
-                #     print(f"ERROR: ensure_firebase_initialized: Firestore client test read FAILED: {test_read_err}")
-                #     traceback.print_exc()
-                #     temp_db_client = None # テスト読み取り失敗ならクライアントを無効とみなす
-            else:
-                print("ERROR: ensure_firebase_initialized: firestore.client() returned None directly.")
-
+            temp_db_client = firestore.client() # プロジェクトIDは通常自動検出
             if temp_db_client is not None:
-                db = temp_db_client
+                db = temp_db_client # グローバル変数に代入
                 print(f"INFO: ensure_firebase_initialized: Firestore client obtained successfully. Global db id: {id(db)}")
             else:
-                print("ERROR: ensure_firebase_initialized: temp_db_client is None after attempting to get it.")
+                # firestore.client() が None を返すのは非常に稀
+                print("ERROR: ensure_firebase_initialized: firestore.client() returned None without raising an exception.")
                 db = None
         except Exception as db_client_err:
-            print(f"ERROR: ensure_firebase_initialized: Exception explicitly raised by firestore.client(): {db_client_err}")
+            print(f"ERROR: ensure_firebase_initialized: Exception getting Firestore client: {db_client_err}")
             traceback.print_exc()
             db = None
     else:
-        print("WARN: ensure_firebase_initialized: _default_app_initialized_flag is False before getting client. Should not happen.")
+        # このパスには通常到達しないはず (initialize_appでエラーになるか、フラグが立つため)
+        print("WARN: ensure_firebase_initialized: _default_app_initialized_flag is False before getting client. This should not happen.")
         db = None
 
     if db is None:
-        print("ERROR: ensure_firebase_initialized: Finished, but global db client is still None. This is the critical issue.")
-    else:
-        print(f"INFO: ensure_firebase_initialized: Finished. Global db client is SET. id(db): {id(db)}")
+        print("ERROR: ensure_firebase_initialized: Finished, but global db client is still None.")
 
 
 
@@ -190,8 +179,6 @@ def check_api_key_status(req: https_fn.Request) -> https_fn.Response:
     HTTPメソッド: GET
     ヘッダー: X-API-KEY (必須)
     """
-    ensure_firebase_initialized() 
-
     if db is None:
         print("ERROR: check_api_key_status: Firestore client not initialized.")
         return create_error_response(
@@ -316,8 +303,6 @@ def record_api_usage(req: https_fn.Request) -> https_fn.Response:
     ヘッダー: X-API-KEY (必須)
     リクエストボディ(JSON): {"transactionId": "unique-string"} (必須)
     """
-    ensure_firebase_initialized() 
-
     if db is None:
         print("ERROR: record_api_usage: Firestore client not initialized.")
         return create_error_response(
@@ -544,7 +529,7 @@ def generate_or_fetch_api_key(req: https_fn.Request) -> https_fn.Response:
     IDトークンでユーザーを認証し、有効なAPIキーを返します。
     キーが存在しない場合は新しく生成して保存してから返します。
     """
-    ensure_firebase_initialized() 
+    ensure_firebase_initialized() # ★★★ この行を追加 ★★★
     if db is None:
         print(
             "ERROR: generate_or_fetch_api_key: Firestore client not initialized."
@@ -708,170 +693,179 @@ def verify_api_key(req: https_fn.Request) -> https_fn.Response:
     """
     APIキーを検証し、利用回数をチェック・カウントアップするHTTP関数。
     """
-    ensure_firebase_initialized()  # Admin SDKとFirestoreクライアントを初期化
+    initialize_services_if_needed()
 
     if db is None:
-        print("ERROR: verify_api_key: Firestore client not initialized or unavailable.")
-        return create_error_response(
-            "Server configuration error: Database unavailable.", 500
+        print("Error in verify_api_key: Firestore client not initialized or unavailable.")
+        return https_fn.Response(
+            "Server configuration error: Firestore unavailable.",
+            status=500
         )
 
-    print("INFO: verify_api_key: Received request.")
+    print("verify_api_key: Received request.")
 
     # 1. リクエストヘッダーからAPIキーを取得
-    api_key = req.headers.get("X-API-KEY")
+    api_key = req.headers.get("X-API-KEY") # ヘッダー名は実際の仕様に合わせる
 
+    # APIキーが存在しない場合
     if not api_key:
-        print("WARN: verify_api_key: API key missing in header.")
-        return create_error_response("API key missing.", 401)
+        print("verify_api_key: Error - API key not provided in header.")
+        return https_fn.Response("Unauthorized: API key missing.", status=401)
 
     # ログ出力用にキーを短縮 (セキュリティ配慮)
-    if len(api_key) > (len(API_KEY_PREFIX) + 3):
-        api_key_short = api_key[:len(API_KEY_PREFIX) + 3] + "..."
+    if len(api_key) > 5:
+        api_key_short = api_key[:5] + "..."
     else:
         api_key_short = api_key
-    print(f"INFO: verify_api_key: Attempting to verify key starting with {api_key_short}")
+    print(f"verify_api_key: Attempting to verify key starting with {api_key_short}")
 
     try:
         # 2. FirestoreでAPIキーを検索
-        keys_ref: firestore.CollectionReference = db.collection("apiKeys") # 型ヒント追加
-        query = keys_ref.where(filter=FieldFilter("key", "==", api_key)).limit(1)
+        keys_ref = db.collection("apiKeys")
+        # keyフィールドで完全一致、結果は最大1件
+        query = keys_ref.where(field_path="key", op_string="==", value=api_key).limit(1)
+        # クエリを実行し、結果を取得
         docs = list(query.stream())
 
         # 3. キーの存在確認
         if not docs:
-            print(f"WARN: verify_api_key: API key not found or invalid: {api_key_short}")
-            return create_error_response("Invalid API key.", 403)
+            # ドキュメントが見つからない場合
+            print(f"verify_api_key: Error - API key not found or invalid: {api_key_short}")
+            # 存在しないキーなので 403 Forbidden を返す
+            return https_fn.Response("Unauthorized: Invalid API key.", status=403)
 
-        key_doc_snapshot: firestore.DocumentSnapshot = docs[0] # 型ヒント追加
+        # キーが見つかった場合、最初のドキュメントを使用
+        key_doc_snapshot = docs[0]
         key_doc_ref: DocumentReference = key_doc_snapshot.reference
-        key_data: dict | None = key_doc_snapshot.to_dict() # to_dict() は None を返す可能性あり
-
-        if key_data is None: # ドキュメントは存在するがデータがない稀なケース
-            print(f"ERROR: verify_api_key: Document {key_doc_snapshot.id} has no data for key {api_key_short}.")
-            return create_error_response("API key data corrupted.", 500)
-
+        key_data: dict = key_doc_snapshot.to_dict()
         doc_id = key_doc_snapshot.id
-        print(f"INFO: verify_api_key: Found key document {doc_id} for {api_key_short}")
+
+        print(f"verify_api_key: Found key document {doc_id} for {api_key_short}")
 
         # 4. キーの有効性 (isEnabled) チェック
+        # isEnabledフィールドが存在しない、またはFalseの場合は無効とみなす
         if not key_data.get("isEnabled", False):
-            print(f"WARN: verify_api_key: API key is disabled: {api_key_short} (Doc ID: {doc_id})")
-            return create_error_response("API key disabled.", 403)
+            print(f"verify_api_key: Error - API key is disabled: {api_key_short} (Doc ID: {doc_id})")
+            return https_fn.Response("Unauthorized: API key disabled.", status=403)
 
         # 5. 利用回数チェックと更新 (トランザクション処理)
-        @firestore.transactional # firestore モジュールを直接使用
+        # トランザクション内で実行される関数を定義
+        @_firestore.transactional  # エイリアス経由で使用
         def check_and_update_usage_transaction(
-            transaction_obj: Transaction, # 型ヒントを明示
+            transaction,  # トランザクションオブジェクト (型ヒントは不要)
             doc_ref_in_transaction: DocumentReference
-        ) -> bool | None:
+        ) -> bool | None:  # 成功時はTrue, 上限超過はNone
             """トランザクション内で利用状況を確認し、更新する (アトミック処理)"""
             try:
-                snapshot: firestore.DocumentSnapshot = doc_ref_in_transaction.get(
-                    transaction=transaction_obj
-                ) # 型ヒント追加
+                # トランザクション内で最新のドキュメントデータを取得
+                snapshot = doc_ref_in_transaction.get(transaction=transaction)
 
+                # ドキュメントが存在しない場合 (トランザクション中に削除されたなど)
                 if not snapshot.exists:
-                    print(f"WARN: verify_api_key (transaction): Document {doc_ref_in_transaction.id} "
-                          "deleted during transaction.")
+                    print(f"verify_api_key: Error in transaction - Doc {doc_ref_in_transaction.id} deleted during transaction.")
+                    # 上限超過と同様にNoneを返して処理を中断
                     return None
 
                 current_data = snapshot.to_dict()
-                if current_data is None: # 通常は起こらないはず
-                    print(f"ERROR: verify_api_key (transaction): Document {snapshot.id} has no data in transaction.")
-                    raise ValueError("Document data is unexpectedly None in transaction.")
 
-
+                # 各フィールドを取得 (存在しない場合のデフォルト値も設定)
                 usage_count: int = current_data.get("usageCount", 0)
-                usage_limit: int = current_data.get("usageLimit", DEFAULT_USAGE_LIMIT)
+                usage_limit: int = current_data.get("usageLimit", 100)  # デフォルト100回
                 last_reset_timestamp: datetime | None = current_data.get("lastReset")
 
                 needs_reset = False
                 now_utc = datetime.now(timezone.utc)
 
+                # 最終リセット日時が存在する場合、月が変わったかチェック
                 if last_reset_timestamp:
-                    # Firestore Timestamp は naive datetime (UTC) として保存されることがあるため、
-                    # 明示的にタイムゾーン情報を付与するか、astimezoneでUTCに正規化
-                    if last_reset_timestamp.tzinfo is None:
-                        last_reset_dt_utc = last_reset_timestamp.replace(tzinfo=timezone.utc)
-                    else:
-                        last_reset_dt_utc = last_reset_timestamp.astimezone(timezone.utc)
-
+                    # Firestore TimestampはUTCとして扱う
+                    last_reset_dt_utc = last_reset_timestamp.replace(tzinfo=timezone.utc)
                     if (last_reset_dt_utc.year < now_utc.year or
-                            (last_reset_dt_utc.year == now_utc.year and
-                             last_reset_dt_utc.month < now_utc.month)):
+                            last_reset_dt_utc.month < now_utc.month):
                         needs_reset = True
 
-                update_fields = {}
+                # 月が変わっていた場合、カウンターをリセット
                 if needs_reset:
-                    print(f"INFO: verify_api_key (transaction): Resetting usage count for key {api_key_short} "
-                          f"(Doc ID: {snapshot.id})")
-                    usage_count = 0  # リセット後のカウントで上限チェックするため更新
-                    update_fields["usageCount"] = 0
-                    update_fields["lastReset"] = firestore.SERVER_TIMESTAMP # firestore モジュールを直接使用
-                
+                    print(f"verify_api_key: Resetting usage count for key {api_key_short} (Doc ID: {snapshot.id})")
+                    usage_count = 0  # カウントをリセット
+                    reset_update_data = {
+                        "usageCount": 0,
+                        "lastReset": _firestore.SERVER_TIMESTAMP  # エイリアス経由で使用
+                    }
+                    transaction.update(doc_ref_in_transaction, reset_update_data)
+                    print("verify_api_key: Usage count reset in transaction.")
+
+                # 上限チェック (リセット後のカウントで比較)
                 if usage_count >= usage_limit:
-                    print(f"WARN: verify_api_key (transaction): Usage limit exceeded for key {api_key_short}. "
+                    print(f"verify_api_key: Error - Usage limit exceeded for key {api_key_short}. "
                           f"Count: {usage_count}, Limit: {usage_limit}")
-                    return None # 上限超過
+                    # 上限超過を示す None を返す
+                    return None
 
                 # 上限未満の場合、カウントをインクリメント
-                print(f"INFO: verify_api_key (transaction): Incrementing usage count for key {api_key_short}. "
+                print(f"verify_api_key: Incrementing usage count for key {api_key_short}. "
                       f"Previous: {usage_count}")
-                update_fields["usageCount"] = firestore.Increment(1) # firestore モジュールを直接使用
-                
-                transaction_obj.update(doc_ref_in_transaction, update_fields)
-                print(f"INFO: verify_api_key (transaction): Usage count updated for key {api_key_short}.")
-                return True # 利用許可
+                increment_update_data = {
+                    # _firestore.Increment でアトミックに+1する
+                    "usageCount": _firestore.Increment(1)  # エイリアス経由で使用
+                }
+                transaction.update(doc_ref_in_transaction, increment_update_data)
+                print("verify_api_key: Usage count incremented in transaction.")
+
+                # 利用許可を示す True を返す
+                return True
 
             except Exception as trans_error:
-                print(f"ERROR: verify_api_key (transaction): Error inside usage check for "
-                      f"{doc_ref_in_transaction.id}: {trans_error}")
-                traceback.print_exc()
-                raise trans_error # トランザクションを失敗させる
+                # トランザクション内での予期せぬエラー
+                print(f"verify_api_key: Error inside usage check transaction for {doc_ref_in_transaction.id}: {trans_error}")
+                # エラーを再送出してトランザクションを失敗させる
+                raise trans_error
 
         # --- トランザクションの実行 ---
-        firestore_transaction_object: Transaction = db.transaction() # 変数名変更と型ヒント
-        update_result: bool | None = None # 初期化
         try:
-            update_result = check_and_update_usage_transaction(
-                firestore_transaction_object, key_doc_ref
-            )
+            # トランザクションオブジェクトを作成
+            transaction_obj = db.transaction()
+            # 定義したトランザクション関数を実行
+            update_result = check_and_update_usage_transaction(transaction_obj, key_doc_ref)
         except Exception as transaction_execution_error:
-            print(f"ERROR: verify_api_key: Transaction execution failed for key {api_key_short}: "
-                  f"{transaction_execution_error}")
+            # トランザクション自体の実行時エラー (内部でraiseされたエラー含む)
+            print(f"verify_api_key: Transaction execution failed for key {api_key_short}: {transaction_execution_error}")
             traceback.print_exc()
-            return create_error_response("Server error during usage update.", 500)
+            return https_fn.Response("Server error during usage update.", status=500)
 
         # 6. トランザクション結果に基づきレスポンスを返す
         if update_result is True:
+            # 正常に利用回数がインクリメントされた場合
             owner_uid = key_data.get("user_uid", "unknown")
-            print(f"INFO: verify_api_key: Success for key {api_key_short}. Owner UID: {owner_uid}")
-            # プレーンテキストで返す場合
+            print(f"verify_api_key: Success for key {api_key_short}. Owner UID: {owner_uid}")
+
+            # ★★★ 本来のAPI処理をここに追加 ★★★
+            # 例: データベース検索、計算、外部API呼び出しなど
+            # api_result = perform_actual_api_work(key_data, req) # 仮の関数呼び出し
+
+            # 仮の成功レスポンス
             return https_fn.Response(f"API key verified successfully for user {owner_uid}!")
-            # JSONで返す場合
-            # return create_success_response(
-            #     {"message": f"API key verified successfully for user {owner_uid}"}
-            # )
-        elif update_result is None: # 上限超過またはドキュメント消失
-            # ドキュメント消失の場合はトランザクション内でエラーになるので、ここは主に上限超過
-            print(f"WARN: verify_api_key: Usage limit likely exceeded for key {api_key_short}.")
-            return create_error_response("Usage limit exceeded.", 429)
+        elif update_result is None:
+            # 上限に達していた場合
+            # ステータスコード 429 Too Many Requests がより適切
+            return https_fn.Response("Forbidden: Usage limit exceeded.", status=429)
         else:
-            # 通常このパスには到達しないはず (TrueかNoneか例外のため)
-            print(f"ERROR: verify_api_key: Unexpected result ({update_result}) from transaction for key {api_key_short}.")
-            return create_error_response("Server error: Unexpected transaction result.", 500)
+            # トランザクション関数が予期せず False などを返した場合 (通常は起こらないはず)
+            print(f"verify_api_key: Unexpected result ({update_result}) from transaction for key {api_key_short}.")
+            return https_fn.Response("Server error: Unexpected transaction result.", status=500)
 
     # 7. 関数全体の例外処理
     except google_exceptions.NotFound as e:
-        print(f"ERROR: verify_api_key: Firestore NotFound Error during initial query for {api_key_short}: {e}")
-        traceback.print_exc()
-        return create_error_response("Invalid API key (not found).", 403)
+        # Firestoreの検索自体で問題があった場合など (例: コレクションが存在しない - 通常考えにくい)
+        print(f"verify_api_key: Firestore NotFound Error during query: {e}")
+        # 403を返すのが適切か、あるいは500か要検討
+        return https_fn.Response("Unauthorized: Invalid API key.", status=403)
     except google_exceptions.PermissionDenied as e:
-        print(f"ERROR: verify_api_key: Firestore Permission Denied for {api_key_short}: {e}")
-        traceback.print_exc()
-        return create_error_response("Server configuration error (permissions).", 500)
+        # Firestoreへのアクセス権限がない場合 (Admin SDKでは通常考えにくい)
+        print(f"verify_api_key: Firestore Permission Denied Error: {e}")
+        return https_fn.Response("Server configuration error (permissions).", status=500)
     except Exception as e:
-        print(f"ERROR: verify_api_key: An unexpected critical error occurred for {api_key_short}: {e}")
-        traceback.print_exc()
-        return create_error_response("Internal Server Error.", 500)
+        # その他の予期せぬエラー全般
+        print(f"verify_api_key: An unexpected critical error occurred: {e}")
+        traceback.print_exc()  # 完全なスタックトレースを出力
+        return https_fn.Response("Internal Server Error", status=500)
