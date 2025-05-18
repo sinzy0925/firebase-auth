@@ -1,9 +1,9 @@
 # firebase
 - デプロイのディレクトリ：
-　- C:\Users\sinzy\firebase-auth　ここで以下のどれかでデプロイする
-　- firebase deploy
-　- firebase deploy --only functions
-　- firebase deploy --only functions --debug 
+　** C:\Users\sinzy\firebase-auth　ここで以下のどれかでデプロイする**
+  ** firebase deploy**
+　** firebase deploy --only functions**
+　** firebase deploy --only functions --debug **
 
 - ローカルでindex.htmlを使ってテストする：
 　- C:\Users\sinzy\firebase-auth\public　へ移動
