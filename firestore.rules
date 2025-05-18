@@ -3,43 +3,82 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    match /apiKeys/{apiKeyId} { // {docId} を {apiKeyId} に変更すると意図が明確かも
-      allow read: if request.auth != null && resource.data.user_uid == request.auth.uid;
-      allow write: if request.auth != null &&
-                      (request.resource.data.user_uid == request.auth.uid || resource.data.user_uid == request.auth.uid);
-      // apiKeysのlistルールは、generate_or_fetch_api_key関数が user_uid で絞り込むため、
-      // より安全にするなら、そのクエリを模倣したルールも検討できます。
-      // 例: allow list: if request.auth != null && request.query.resource.data.user_uid == request.auth.uid;
-      // ただし、listルールで request.query.resource は使えないので、
-      // 実際には request.auth.uid を使ったクエリを強制する形になります。
-      // シンプルにするなら現状の limit だけでも良いですが、より絞ることも可能です。
-      allow list: if request.auth != null && request.query.limit <= 100;
+    // APIキー (apiKeys) コレクション
+    match /apiKeys/{apiKeyId} {
+
+      // 自分のAPIキー情報を読み取れる (単一ドキュメント取得)
+      allow get: if request.auth != null && resource.data.user_uid == request.auth.uid;
+
+      // 自分のAPIキーのリストを取得できる (コレクション取得)
+      // 注意: クライアント(app.js)は .where("user_uid", "==", request.auth.uid) でクエリすることを強く推奨します。
+      // Firestore Rulesの制約上、listルール内でそのクエリの user_uid を直接検証することは困難です。
+      // このルールのみでは、認証済みユーザーが他のユーザーのAPIキーのメタデータ（キー文字列自体ではない）を
+      // (下記の件数制限付きで)リストできてしまう可能性があります。
+      // より安全性を高めるには、APIキーのリスト取得専用のCloud Functionを用意し、
+      // その関数内で user_uid によるフィルタリングを確実に実施することを推奨します。
+      allow list: if request.auth != null &&
+                     request.query.limit <= 10; // 1回に取得できる件数を制限 (例: 10件)
+
+      // 自分の新しいAPIキーを作成できる
+      // 注: 本来はCloud Functions (例: generate_or_fetch_api_key) 経由での作成がより安全で推奨されます。
+      // このルールは、既存の app.js の実装 (クライアントからの直接作成) を許容するためのものです。
+      // 作成時に設定できるフィールドと値を厳格に制限しています。
+      allow create: if request.auth != null &&
+                       request.resource.data.user_uid == request.auth.uid &&
+                       request.resource.data.key is string &&
+                       request.resource.data.key.size() >= 35 && // 例: "sk_" + 32文字 = 35文字
+                       request.resource.data.usageCount == 0 &&
+                       request.resource.data.usageLimit is number && // 将来の拡張性を考慮し型のみチェック
+                       request.resource.data.usageLimit > 0 &&     // 0より大きいことを保証
+                       (request.resource.data.usageLimit == 100 || request.resource.data.usageLimit == 1000) && // 例えば許可する上限値を指定
+                       request.resource.data.isEnabled == true &&
+                       request.resource.data.ownerEmail == request.auth.token.email &&
+                       request.resource.data.created_at == request.time && // サーバータイムスタンプを期待
+                       request.resource.data.lastReset == request.time &&  // サーバータイムスタンプを期待
+                       // 以下のフィールドのみ存在し、それ以外のフィールドは許可しない
+                       request.resource.data.keys().hasOnly(['key', 'user_uid', 'created_at', 'usageCount', 'usageLimit', 'lastReset', 'isEnabled', 'ownerEmail']);
+
+      // 自分のAPIキーを更新できる (isEnabled プロパティの変更のみを想定)
+      // 他の重要なフィールド (usageCount, usageLimit など) はユーザーが直接変更できないようにします。
+      allow update: if request.auth != null &&
+                       resource.data.user_uid == request.auth.uid && // 更新対象は自分のキーであること
+                       request.resource.data.user_uid == resource.data.user_uid && // user_uid は変更不可
+                       request.resource.data.key == resource.data.key &&             // key は変更不可
+                       request.resource.data.created_at == resource.data.created_at && // created_at は変更不可
+                       request.resource.data.ownerEmail == resource.data.ownerEmail && // ownerEmail は変更不可
+                       // usageCount, usageLimit, lastReset はサーバー(Function)側で管理するためユーザー変更不可
+                       request.resource.data.usageCount == resource.data.usageCount &&
+                       request.resource.data.usageLimit == resource.data.usageLimit &&
+                       request.resource.data.lastReset == resource.data.lastReset &&
+                       // isEnabled (キーの有効/無効状態) のみユーザーが変更可能
+                       request.resource.data.isEnabled is bool &&
+                       // 上記以外のフィールドが追加されたり、必須フィールドが欠けたりするのを防ぐ
+                       request.resource.data.keys().hasOnly(['key', 'user_uid', 'created_at', 'usageCount', 'usageLimit', 'lastReset', 'isEnabled', 'ownerEmail']);
+
+      // 自分のAPIキーを削除できる
+      allow delete: if request.auth != null && resource.data.user_uid == request.auth.uid;
     }
 
-    // processedTransactions コレクションのルール
+    // processedTransactions コレクション
+    // このコレクションへのアクセスは、Cloud Functions (例: record_api_usage) が
+    // Admin SDK を使用して行うことを想定しています (Admin SDKはセキュリティルールをバイパスします)。
+    // そのため、クライアントからの直接の読み書きは一切許可しません。
     match /processedTransactions/{transactionDocId} {
-      // 関数 (record_api_usage) からの作成と読み取りを許可
-      // このルールは、関数が信頼できるコンテキストで実行されることを前提とします。
-      // クライアントからの直接アクセスは想定していません。
-      // 重要: このルールでは誰でも (認証なしでも) read/create できてしまうため、
-      // 関数が公開エンドポイントの場合はセキュリティリスクになります。
-      // 関数がバックエンド間通信で使われる場合は許容できるかもしれません。
-      // より安全にするには、関数の呼び出し元を検証するか、
-      // 関数が特定のサービスアカウントとして動作し、そのSAのみを許可するルールにします。
-      allow read, create: if true; // ★注意: 開発用。本番では要セキュリティ検討★
-
-      // 更新と削除は通常不要
-      allow update, delete: if false;
+      allow read, write: if false;
     }
 
     // test_collection (hello_world関数用、以前のまま)
+    // 本番環境では不要な場合が多いため、原則アクセスを禁止します。
+    // もし本番でも必要であれば、適切な権限設定に見直してください。
     match /test_collection/{docId} {
-      allow read, write: if true; // 開発用。本番では要検討
+      allow read, write: if false;
     }
 
     // test_from_hello (helloWorld関数用、以前のまま)
+    // 本番環境では不要な場合が多いため、原則アクセスを禁止します。
+    // もし本番でも必要であれば、適切な権限設定に見直してください。
     match /test_from_hello/{docId} {
-        allow read, write: if true; // 開発用。本番では要検討
+      allow read, write: if false;
     }
   }
 }

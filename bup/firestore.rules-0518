@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /apiKeys/{apiKeyId} { // {docId} を {apiKeyId} に変更すると意図が明確かも
+      allow read: if request.auth != null && resource.data.user_uid == request.auth.uid;
+      allow write: if request.auth != null &&
+                      (request.resource.data.user_uid == request.auth.uid || resource.data.user_uid == request.auth.uid);
+      // apiKeysのlistルールは、generate_or_fetch_api_key関数が user_uid で絞り込むため、
+      // より安全にするなら、そのクエリを模倣したルールも検討できます。
+      // 例: allow list: if request.auth != null && request.query.resource.data.user_uid == request.auth.uid;
+      // ただし、listルールで request.query.resource は使えないので、
+      // 実際には request.auth.uid を使ったクエリを強制する形になります。
+      // シンプルにするなら現状の limit だけでも良いですが、より絞ることも可能です。
+      allow list: if request.auth != null && request.query.limit <= 100;
+    }
+
+    // processedTransactions コレクションのルール
+    match /processedTransactions/{transactionDocId} {
+      // 関数 (record_api_usage) からの作成と読み取りを許可
+      // このルールは、関数が信頼できるコンテキストで実行されることを前提とします。
+      // クライアントからの直接アクセスは想定していません。
+      // 重要: このルールでは誰でも (認証なしでも) read/create できてしまうため、
+      // 関数が公開エンドポイントの場合はセキュリティリスクになります。
+      // 関数がバックエンド間通信で使われる場合は許容できるかもしれません。
+      // より安全にするには、関数の呼び出し元を検証するか、
+      // 関数が特定のサービスアカウントとして動作し、そのSAのみを許可するルールにします。
+      allow read, create: if true; // ★注意: 開発用。本番では要セキュリティ検討★
+
+      // 更新と削除は通常不要
+      allow update, delete: if false;
+    }
+
+    // test_collection (hello_world関数用、以前のまま)
+    match /test_collection/{docId} {
+      allow read, write: if true; // 開発用。本番では要検討
+    }
+
+    // test_from_hello (helloWorld関数用、以前のまま)
+    match /test_from_hello/{docId} {
+        allow read, write: if true; // 開発用。本番では要検討
+    }
+  }
+}
