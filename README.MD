@@ -1,16 +1,19 @@
 # firebase
 ### デプロイのディレクトリ：
-    ```bash
-    C:\Users\sinzy\firebase-auth　#ここで以下のどれかでデプロイする
-    firebase deploy
-　  firebase deploy --only functions
-　  firebase deploy --only functions --debug
-    ```
+
+```bash
+C:\Users\sinzy\firebase-auth　#ここで以下のどれかでデプロイする
+firebase deploy
+firebase deploy --only functions
+firebase deploy --only functions --debug
+```
 
 ### ローカルでindex.htmlを使ってテストする：
-　- C:\Users\sinzy\firebase-auth\public　へ移動
-　- python -m http.server 8088
-  - APIキー作成はできなくした。
+C:\Users\sinzy\firebase-auth\public　へ移動
+---
+python -m http.server 8088
+---
+APIキー作成はできなくした。
 　
 ### ブラウザで　localhost:8088 で起動して、
 　- devtoolのコンソールの一番したに以下を貼り付けて実行
