@@ -26,13 +26,18 @@ curl -X GET -H "Authorization: Bearer <YOUR_ID_TOKEN>" https://generate-or-fetch
 ```
 
 ### 実行前にAPIKEYチェック＋カウントアップ(古いシステムで採用：Chrome-Record-Scraper)
-- curl -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" https://verify-api-key-.a.run.app
-
+```bash
+curl -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" https://verify-api-key-.a.run.app
+```
 ### 実行前にAPIKEYチェック　カウントはそのまま
-- curl -X GET -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" https://check-api-key-.a.run.app 
-
+```bash
+curl -X GET -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" https://check-api-key-.a.run.app 
+```
 ### 実行後にAPIKEYチェック　カウントアップ
-- curl -X POST -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" -H "Content-Type: application/json" -d '{"transactionId": "unique_transaction_id_001"}' https://record-api-usage-.a.run.app
-
+```bash
+curl- curl -X POST -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" -H "Content-Type: application/json" -d '{"transactionId": "unique_transaction_id_001"}' https://record-api-usage-.a.run.app
+```
 ### 実行後にAPIKEYチェック　２回目ではカウントアップしない
-- curl -X POST -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" -H "Content-Type: application/json" -d '{"transactionId": "unique_transaction_id_001"}' https://record-api-usage-.a.run.app
+```bash
+curl -X POST -H "X-API-KEY: sk_iWs311nVIWv8dEZLIgwO7sM2p35c29Ll" -H "Content-Type: application/json" -d '{"transactionId": "unique_transaction_id_001"}' https://record-api-usage-.a.run.app
+```
