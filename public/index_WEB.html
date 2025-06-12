@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Key Manager</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <h1>API Key Manager</h1>
+
+    <div id="auth-container">
+        <div id="user-info" style="display: none;">
+            <p>ようこそ、<span id="user-name"></span> さん</p>
+            <p>Email: <span id="user-email"></span></p>
+            <button id="logout-button">ログアウト</button>
+        </div>
+        <div id="login-prompt" style="display: block;">
+            <p>Googleアカウントでログインしてください。</p>
+            <button id="login-button">Googleでログイン</button>
+        </div>
+    </div>
+
+    <hr>
+
+    <div id="api-key-section" style="display: none;">
+        <h2>あなたのAPIキー</h2>
+        <button id="generate-key-button">新しいAPIキーを生成</button>
+        <ul id="api-key-list">
+            <!-- APIキーがここに追加されます -->
+        </ul>
+    </div>
+
+    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+
+    <!-- Add Firebase products that you want to use -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+    <script>
+      // Your web app's Firebase configuration
+      // ここにステップ1-4でコピーした firebaseConfig の内容を貼り付けます
+      const firebaseConfig = {
+        apiKey: "AIzaSyBssebZlbgNyO0QcI5GckY3CZRYZVKarRo",
+        authDomain: "sinzy0925-1d67f.firebaseapp.com",
+        databaseURL: "https://sinzy0925-1d67f.firebaseio.com",
+        projectId: "sinzy0925-1d67f",
+        storageBucket: "sinzy0925-1d67f.firebasestorage.app",
+        messagingSenderId: "373628373470",
+        appId: "1:373628373470:web:e529dba2197e12b07db54f"
+      };
+
+      // Initialize Firebase
+      firebase.initializeApp(firebaseConfig);
+
+      // --- ▼▼▼ ここから追加 ▼▼▼ ---
+    // ローカルホストで実行されている場合のみエミュレータに接続する
+    if (window.location.hostname === "localhost") {
+        console.log("ローカルテスト環境を検出。エミュレータに接続します。");
+        // Auth Emulatorへの接続
+        firebase.auth().useEmulator("http://localhost:9099");
+        // Firestore Emulatorへの接続
+        firebase.firestore().useEmulator("localhost", 8080);
+    }
+    // --- ▲▲▲ ここまで追加 ▲▲▲ ---
+
+      // 他のスクリプトファイル（app.js）を読み込む
+      // この行は firebase.initializeApp(firebaseConfig); の後である必要があります
+    </script>
+    <script src="app.js"></script>
+
+</body>
+</html>

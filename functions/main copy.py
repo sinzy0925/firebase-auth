@@ -701,43 +701,15 @@ def record_api_usage(req: https_fn.Request) -> https_fn.Response:
                 "wasReset": transaction_result_container["was_reset_in_txn"],
                 "expiresAt": expires_at
             })
-            
-            # --- ▼▼▼ ここから修正 ▼▼▼ ---
-            
-            # レスポンスに含める残り回数を計算する
-            # transaction_result_container から最新の値を取得
-            # key_data_outside_txn からは古い値しか取れないので注意
-            
-            final_usage_count = transaction_result_container["final_usage_count"]
-            # usageLimit はトランザクション外のデータから取得しても良い (通常は変更されないため)
-            usage_limit = key_data_outside_txn.get("usageLimit", DEFAULT_USAGE_LIMIT)
-            remaining_usages = max(0, usage_limit - final_usage_count)
-            
             logger.info(
                 f"record_api_usage: Successfully recorded usage for key {api_key_short_log}, "
-                f"txnId {transaction_id}. Effective count: {final_usage_count}, Remaining: {remaining_usages}"
+                f"txnId {transaction_id}. Effective count: {transaction_result_container['final_usage_count']}"
             )
-            
-            # レスポンスに残り回数と上限値を追加する
             return create_success_response(data={
                 "status": "success",
                 "message": "Usage recorded successfully.",
-                "newEffectiveUsageCount": final_usage_count,
-                "remainingUsages": remaining_usages,
-                "usageLimit": usage_limit
+                "newEffectiveUsageCount": transaction_result_container["final_usage_count"]
             })
-            
-            # --- ▲▲▲ ここまで修正 ▲▲▲ ---
-            ####
-            #logger.info(
-            #    f"record_api_usage: Successfully recorded usage for key {api_key_short_log}, "
-            #    f"txnId {transaction_id}. Effective count: {transaction_result_container['final_usage_count']}"
-            #)
-            #return create_success_response(data={
-            #    "status": "success",
-            #    "message": "Usage recorded successfully.",
-            #    "newEffectiveUsageCount": transaction_result_container["final_usage_count"]
-            #})
         else:
             logger.error(
                 f"record_api_usage: Transaction for {api_key_short_log}, txnId {transaction_id} "
