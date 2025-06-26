@@ -1,0 +1,46 @@
+body {
+    font-family: sans-serif;
+    padding: 20px;
+    line-height: 1.6;
+}
+
+#auth-container, #api-key-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+button {
+    padding: 10px 15px;
+    cursor: pointer;
+    margin-right: 5px;
+    margin-top: 5px;
+}
+
+#user-info p {
+    margin: 5px 0;
+}
+
+#api-key-list {
+    list-style: none;
+    padding: 0;
+}
+
+#api-key-list li {
+    background-color: #f4f4f4;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    word-break: break-all; /* 長いキーがはみ出ないように */
+}
+
+#api-key-list li button {
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+}

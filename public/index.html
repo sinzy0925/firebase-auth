@@ -3,62 +3,353 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Key Manager</title>
-    <link rel="stylesheet" href="style.css">
+    <title>AI Web Agent - あなた専属のAIリサーチアシスタント</title>
+
+    <style>
+        :root {
+            --primary-color: #4a69bd; /* 少し落ち着いた青 */
+            --secondary-color: #1abc9c; /* アクセントの緑 */
+            --background-color: #f8f9fa;
+            --text-color: #34495e;
+            --card-bg-color: #ffffff;
+            --light-gray: #ecf0f1;
+        }
+    
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+            line-height: 1.8;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+    
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+    
+        .header {
+            text-align: center;
+            padding: 80px 20px;
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            color: white;
+        }
+    
+        .header h1 {
+            margin: 0;
+            font-size: 3.2rem;
+            font-weight: 700;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.2);
+        }
+    
+        .header p {
+            font-size: 1.3rem;
+            opacity: 0.95;
+            margin-top: 15px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    
+        .section {
+            padding: 80px 20px;
+        }
+        
+        h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            color: var(--primary-color);
+            margin-bottom: 50px;
+            position: relative;
+        }
+    
+        h2::after {
+            content: '';
+            display: block;
+            width: 60px;
+            height: 4px;
+            background-color: var(--secondary-color);
+            margin: 15px auto 0;
+            border-radius: 2px;
+        }
+    
+        /* ▼▼▼▼▼ ここからが変更・追加箇所 ▼▼▼▼▼ */
+        .concept-flow {
+            display: flex;
+            flex-wrap: wrap; /* スマホ表示などで折り返すように */
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 50px;
+        }
+    
+        .concept-flow .step {
+            background-color: #ffffff;
+            border: 2px solid var(--light-gray);
+            border-radius: 12px; /* 角を丸くする */
+            padding: 15px 25px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary-color);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+    
+        .concept-flow .step:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+        }
+    
+        .concept-flow .step .icon {
+            font-size: 1.5rem;
+        }
+    
+        .concept-flow .arrow {
+            font-size: 2rem;
+            color: var(--secondary-color);
+            font-weight: bold;
+        }
+        /* ▲▲▲▲▲ ここまでが変更・追加箇所 ▲▲▲▲▲ */
+    
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+        }
+    
+        .feature-item {
+            background-color: var(--card-bg-color);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-top: 4px solid var(--secondary-color);
+        }
+        
+        .feature-item:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+    
+        .feature-item-icon {
+            font-size: 3.5rem;
+            margin-bottom: 20px;
+        }
+    
+        .feature-item h3 {
+            font-size: 1.5rem;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+        }
+    
+        .pricing-section {
+            background-color: var(--light-gray);
+        }
+    
+        .pricing-grid {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+    
+        .pricing-plan {
+            background-color: var(--card-bg-color);
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            width: 320px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+            border: 2px solid transparent;
+            transition: transform 0.3s;
+        }
+        
+        .pricing-plan:hover {
+            transform: scale(1.03);
+        }
+    
+        .pricing-plan h3 {
+            font-size: 1.6rem;
+            color: var(--primary-color);
+        }
+    
+        .price {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 20px 0;
+        }
+        
+        .price .unit {
+            font-size: 1rem;
+            font-weight: normal;
+        }
+        
+        .pricing-plan.highlight .price {
+             color: var(--secondary-color);
+        }
+    
+        .pricing-plan ul {
+            list-style: none;
+            padding: 0;
+            margin: 25px 0;
+            text-align: left;
+        }
+    
+        .pricing-plan li {
+            padding: 10px 0;
+            border-bottom: 1px solid var(--light-gray);
+        }
+        
+        .pricing-plan li::before {
+            content: '✔';
+            color: var(--secondary-color);
+            margin-right: 10px;
+            font-weight: bold;
+        }
+    
+        .info-box {
+            background-color: var(--card-bg-color);
+            border-left: 5px solid var(--secondary-color);
+            padding: 20px 25px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+    
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            background-color: #2c3e50;
+            color: rgba(255, 255, 255, 0.8);
+        }
+    
+        .footer p {
+            margin: 5px 0;
+        }
+        
+        .footer a {
+            color: white;
+            text-decoration: underline;
+        }
+    
+    </style>
 </head>
 <body>
 
-    <h1>API Key Manager</h1>
+    <header class="header">
+        <h1>AI Web Agent</h1>
+        <p>あなたの質問から、AIが自律的にWebを調査し、<br>最適な答えを導き出すリサーチアシスタントです。</p>
+    </header>
 
-    <div id="auth-container">
-        <div id="user-info" style="display: none;">
-            <p>ようこそ、<span id="user-name"></span> さん</p>
-            <p>Email: <span id="user-email"></span></p>
-            <button id="logout-button">ログアウト</button>
-        </div>
-        <div id="login-prompt" style="display: block;">
-            <p>Googleアカウントでログインしてください。</p>
-            <button id="login-button">Googleでログイン</button>
-        </div>
+    <div class="container">
+
+        <section class="section">
+            <h2>AI Web Agent とは？</h2>
+            <p style="text-align: center; max-width: 700px; margin: 0 auto 50px; font-size: 1.1rem;">
+                AI Web Agentは、単に質問に答えるだけのチャットボットではありません。あなたが与えた調査テーマに基づき、AIエージェントが自ら思考し、計画を立て、Web検索やサイト分析を粘り強く繰り返すことで、人間のように深いリサーチを実行します。
+            </p>
+        
+            <!-- ▼▼▼▼▼ ここからが変更箇所 ▼▼▼▼▼ -->
+            <div class="concept-flow">
+                <div class="step">
+                    <span class="icon">💬</span>
+                    <span>① 指示</span>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <span class="icon">🤔</span>
+                    <span>② AIが思考・計画</span>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <span class="icon">🔍</span>
+                    <span>③ Web調査・分析</span>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <span class="icon">💡</span>
+                    <span>④ 自己評価・深掘り</span>
+                </div>
+                <div class="arrow">→</div>
+                <div class="step">
+                    <span class="icon">✅</span>
+                    <span>⑤ 最終回答</span>
+                </div>
+            </div>
+            <!-- ▲▲▲▲▲ ここまでが変更箇所 ▲▲▲▲▲ -->
+        
+        </section>
+        <section class="section" style="background-color: #fff; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.05);">
+            <h2>エージェントが利用する強力なツール群</h2>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-item-icon">🔍</div>
+                    <h3>自律型Google検索</h3>
+                    <p>AIが最適なキーワードを考え、検索を実行。結果を分析し、有望な情報源を見つけ出します。</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-item-icon">📄</div>
+                    <h3>深層サイトクローリング</h3>
+                    <p>見つけたサイトを深く読み込み、必要な情報を抽出。PDFやOffice文書の中身まで見逃しません。</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-item-icon">💡</div>
+                    <h3>自己評価と改善ループ</h3>
+                    <p>一度の結果で満足せず、「まだ情報が足りないか？」と自問自答。納得のいく答えが得られるまで調査を繰り返します。</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="section pricing-section">
+            <h2>料金プラン</h2>
+            <p style="text-align: center; max-width: 700px; margin: 0 auto 50px;">
+                まずは無料でお試しください。より高度で大規模なリサーチが必要になった場合のみ、柔軟なプランでご利用を継続できます。
+            </p>
+            <div class="pricing-grid">
+                <div class="pricing-plan">
+                    <h3>無料プラン</h3>
+                    <div class="price">¥0<span class="unit">/月</span></div>
+                    <ul>
+                        <li>AIエージェントの利用 **毎月100回** まで</li>
+                        <li>すべての基本リサーチ機能</li>
+                        <li>月が変わると利用回数は自動リセット</li>
+                    </ul>
+                </div>
+                <div class="pricing-plan highlight">
+                    <h3>追加クレジット<br>（買い切り）</h3>
+                    <div class="price">¥500<span class="unit">から</span></div>
+                    <ul>
+                        <li><strong>100回分 / 500円</strong></li>
+                        <li><strong>500回分 / 2,000円</strong></li>
+                        <li>無料枠を使い切った後も継続利用可能</li>
+                        <li style="font-weight: bold;">購入分は無期限で繰り越し可能</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>ポリシー情報</h2>
+            <div class="info-box">
+                <p><strong>返品・返金ポリシー:</strong> ご購入いただいた追加クレジットはデジタルコンテンツの性質上、理由の如何を問わず、購入後の返品・返金は一切お受けできません。ご購入前にサービス内容を十分にご確認ください。</p>
+            </div>
+            <div class="info-box">
+                 <p><strong>キャンセルポリシー:</strong> 本サービスは都度購入（買い切り）モデルです。一度完了した購入手続きのキャンセルはできません。</p>
+            </div>
+        </section>
+
     </div>
 
-    <hr>
-
-    <div id="api-key-section" style="display: none;">
-        <h2>あなたのAPIキー</h2>
-        <button id="generate-key-button">新しいAPIキーを生成</button>
-        <ul id="api-key-list">
-            <!-- APIキーがここに追加されます -->
-        </ul>
-    </div>
-
-    <!-- Firebase App (the core Firebase SDK) is always required and must be listed first -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-
-    <!-- Add Firebase products that you want to use -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-
-    <script>
-      // Your web app's Firebase configuration
-      // ここにステップ1-4でコピーした firebaseConfig の内容を貼り付けます
-      const firebaseConfig = {
-        apiKey: "AIzaSyBssebZlbgNyO0QcI5GckY3CZRYZVKarRo",
-        authDomain: "sinzy0925-1d67f.firebaseapp.com",
-        databaseURL: "https://sinzy0925-1d67f.firebaseio.com",
-        projectId: "sinzy0925-1d67f",
-        storageBucket: "sinzy0925-1d67f.firebasestorage.app",
-        messagingSenderId: "373628373470",
-        appId: "1:373628373470:web:e529dba2197e12b07db54f"
-      };
-
-      // Initialize Firebase
-      firebase.initializeApp(firebaseConfig);
-
-      // 他のスクリプトファイル（app.js）を読み込む
-      // この行は firebase.initializeApp(firebaseConfig); の後である必要があります
-    </script>
-    <script src="app.js"></script>
+    <footer class="footer">
+        <p><strong>AI Web Agent (事業名: Very Glad)</strong></p>
+        <p>カスタマーサービス連絡先: <a href="mailto:info@veryglad.net">info＠veryglad.net</a></p>
+        <p>© 2025 Very Glad. All Rights Reserved.</p>
+    </footer>
 
 </body>
 </html>
