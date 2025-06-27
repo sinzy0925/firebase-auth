@@ -80,3 +80,7 @@ node_modules/
 
 # ソースコピーアプリと結果
 code*
+
+# macOS
+.DS_Store
+*.log
